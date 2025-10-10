@@ -1,52 +1,88 @@
 <?php
-    require_once('config.php');
-$stmt = $pdo->query("SELECT * FROM messages ORDER BY created_at DESC");
+require_once 'config.php';
+
+// Получаем все сообщения с именем автора
+$stmt = $pdo->query("
+    SELECT m.*, u.username 
+    FROM messages m 
+    JOIN users u ON m.user_id = u.id 
+    ORDER BY m.created_at DESC
+");
 $messages = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-    <link rel="stylesheet" href="style.css">
+    <title> Гостевая книга</title>
+    <link rel="stylesheet" href="style.CSS">
 </head>
 <body>
-<div class="box">
-    <form method="POST" action = "add.php">
-        <input type="text" name="name" placeholder="Your name" required>
-        <textarea name="message" rows="4" placeholder="Your message" required></textarea>
-        <button type="submit">Отправить</button>
-    </form>
+    <div class="container">
 
-    <h3>Сообщение <?= count($messages) ?></h3>
+        <!-- Панель авторизации -->
+        <div class="auth-bar">
+            <?php if (isUser()): ?>
+                Привет, <strong><?= htmlspecialchars($_SESSION['user']['username']) ?></strong>
+                <?php if (isAdmin()): ?>
+                    <span class="admin-tag">АДМИН</span>
+                <?php endif; ?>
+                <a href="logout.php"> Выйти</a>
+            <?php else: ?>
+                <a href="login.php">Войти</a>
+                <a href="register.php"> Регистрация</a>
+            <?php endif; ?>
+        </div>
+        
+        <h1>Гостевая книга</h1>
 
-    <?php if (empty($messages)): ?>
-        <p>Будьте первым!</p>
-    <?php else:?>
-        <?php foreach ($messages as $msg): ?>
-            <div class="message">
-                <div class="name">
-                    <?= htmlspecialchars($msg['name']) ?>
-                </div>
+        <!-- Форма добавления (только для авторизованных) -->
+        <?php if (isUser()): ?>
+            <form action="add.php" method="POST">
+                <textarea name="message" rows="3" placeholder="Напишите сообщение..." required></textarea>
+                <button type="submit">Отправить</button>
+            </form>
+        <?php else: ?>
+            <p><a href="login.php">Войдите</a> или <a href="register.php">зарегистрируйтесь</a>, чтобы оставить сообщение.</p>
+        <?php endif; ?>
+
+        <hr>
+
+        <!-- Список сообщений -->
+        <h3>Сообщения (<?= count($messages) ?>):</h3>
+        <?php if (empty($messages)): ?>
+            <p>Пока нет сообщений. Будьте первым!</p>
+        <?php else: ?>
+            <?php foreach ($messages as $msg): ?>
                 <div class="message">
-                    <?= htmlspecialchars($msg['message']) ?>
+                    <div class="message-header">
+                        <div>
+                            <span class="username"><?= htmlspecialchars($msg['username']) ?></span>
+                            <?php if ($msg['username'] === 'admin'): ?>
+                                <span class="admin-tag">АДМИН</span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="date"> <?= $msg['created_at'] ?></div>
+                    </div>
+                    <div style="margin: 10px 0;"><?= nl2br(htmlspecialchars($msg['message'])) ?></div>
+
+                    <!-- Кнопки действий (если авторизован и это твоё сообщение или ты админ) -->
+                    <?php if (isUser() && (isAdmin() || $msg['user_id'] == getCurrentUserId())): ?>
+                        <div class="actions">
+                            <a href="edit.php?id=<?= $msg['id'] ?>"> Редактировать</a>
+                            <form action="delete.php" method="POST" style="display:inline;" onsubmit="return confirm('Удалить?')">
+                                <input type="hidden" name="id" value="<?= $msg['id'] ?>">
+                                <button type="submit" style="background:none; border:none; color:red; cursor:pointer; padding:0;"> Удалить</button>
+                            </form>
+                        </div>
+                    <?php endif; ?>
                 </div>
-                <div class="date">
-                    <?= $msg['created_at'] ?>
-                    <a href="delete.php?id=<?= $msg['id'] ?>"
-                        onclick="return confirm('Вы уверены, что хотите удалить это сообщение?')">
-                        Удалить
-                    </a>
-                    <form action="edit.php" method="GET" style="display: inline;">
-                        <input type="hidden" name="id" value="<?= $msg['id'] ?>">
-                        <button type="submit" class="btn btn-edit">Редактировать</button>
-                    </form>
-                </div>
-            </div>
-        <?php endforeach; ?>
-    <?php endif; ?>
-</div>
+            <?php endforeach; ?>
+        <?php endif; ?>
+
+    
+
+    </div>
 </body>
 </html>
